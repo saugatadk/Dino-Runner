@@ -4,11 +4,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-// stb_easy_font implementation (public domain)
 #define STB_EASY_FONT_IMPLEMENTATION
 #include "stb_easy_font.h"
 
-// Vertex shader source
+// Processes each corner of shapes
 const char* vertexSrc = R"(
 #version 330 core
 layout(location = 0) in vec2 aPos;
@@ -20,7 +19,7 @@ void main() {
 }
 )";
 
-// Fragment shader source for text
+// Colors each pixel of shape
 const char* textFragmentSrc = R"(
 #version 330 core
 out vec4 FragColor;
@@ -30,7 +29,7 @@ void main() {
 }
 )";
 
-// Vertex shader source for text
+// convert scree pixel coordinates to OpenGL's coordinates
 const char* textVertexSrc = R"(
 #version 330 core
 layout(location = 0) in vec2 aPos;
@@ -43,7 +42,7 @@ void main() {
 }
 )";
 
-// Fragment shader source
+// set colors of object
 const char* fragmentSrc = R"(
 #version 330 core
 out vec4 FragColor;
@@ -53,38 +52,35 @@ void main() {
 }
 )";
 
-// Window dimensions
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-// Unit quad verts
+// foundation for objects
 float quadVerts[] = { -0.5f, -0.5f,  0.5f, -0.5f,  0.5f,  0.5f,  -0.5f,  0.5f };
 unsigned int quadIdx[] = { 0,1,2,  2,3,0 };
 
-// Game state - inspired by test.cpp complexity
 float dinoY = 0.0f;
 float vel = 0.0f;
-const float grav = -5.0f;  // Chrome-like gravity  
-const float jump = 2.2f;   // Improved jump height like test.cpp
+const float grav = -5.0f;  
+const float jump = 2.2f;   
 bool onGround = true;
 bool gameOver = false;
 int score = 0;
-bool nightMode = false;    // Night mode feature
-int nightModeThreshold = 10; // Switch to night mode after 100 points
+bool nightMode = false;    
+int nightModeThreshold = 10; 
 
 struct Obstacle { float x, w; bool scored; };
 std::vector<Obstacle> obstacles;
 float timer = 0.0f;
-float baseInterval = 1.5f;    // Dynamic base interval like test.cpp
+float baseInterval = 1.5f;    
 
-// Function to reset game state
 void resetGame() {
     dinoY = 0.0f;
     vel = 0.0f;
     onGround = true;
     gameOver = false;
     score = 0;
-    nightMode = false;  // Reset night mode
+    nightMode = false;  
     obstacles.clear();
     timer = 0.0f;
 }
@@ -146,14 +142,12 @@ int main() {
     float last = glfwGetTime();
     while (!glfwWindowShouldClose(window)) {
         float now = glfwGetTime(), dt = now - last; last = now;
-        // Input handling
         if (!gameOver) {
-            // Jump when UP key is pressed and dinosaur is on ground
+            // Jump when UP or Space key is pressed and dinosaur is on ground
             if (glfwGetKey(window, GLFW_KEY_UP)==GLFW_PRESS && onGround) { 
                 vel = jump; 
                 onGround = false; 
             }
-            // Alternative jump with SPACE key
             if (glfwGetKey(window, GLFW_KEY_SPACE)==GLFW_PRESS && onGround) { 
                 vel = jump; 
                 onGround = false; 
@@ -169,86 +163,83 @@ int main() {
         }
         // Exit game
         if (glfwGetKey(window, GLFW_KEY_ESCAPE)==GLFW_PRESS) glfwSetWindowShouldClose(window,true);
-        // Update - Enhanced complexity inspired by test.cpp
+        
         if (!gameOver) {
-            vel += grav*dt; dinoY += vel*dt;
-            if (dinoY<=0) { dinoY=0; vel=0; onGround=true; }
+            vel += grav*dt; 
+            dinoY += vel*dt;
+
+            if (dinoY<=0){ 
+                dinoY=0; vel=0; onGround=true; 
+            }
             
-            // Night mode toggle like Chrome (every 100 points)
             bool shouldBeNight = (score / nightModeThreshold) % 2 == 1;
             nightMode = shouldBeNight;
             
-            // Dynamic difficulty system like test.cpp
-            float currentInterval = baseInterval - std::min(score*0.02f, 1.0f); // Decreases with score
+            float currentInterval = baseInterval - std::min(score*0.02f, 1.0f); 
             
             timer+=dt; 
             if (timer>=currentInterval) { 
                 timer=0; 
-                obstacles.push_back({1.2f, 0.08f, false}); // Start farther right like test.cpp
+                obstacles.push_back({1.2f, 0.08f, false});
             }
             
-            // More aggressive speed increase like test.cpp
             float obstacleSpeed = 0.5f + score * 0.05f; // Faster acceleration
             
             for (size_t i=0;i<obstacles.size();) {
-                obstacles[i].x -= obstacleSpeed*dt;
+                obstacles[i].x -= obstacleSpeed*dt;  // X decreases = moves left
                 float hw=obstacles[i].w*0.5f;
                 if (!obstacles[i].scored && obstacles[i].x+hw< -0.5f) { score++; obstacles[i].scored=true; }
-                // Precise collision detection for dinosaur with forward-pointing triangular head
-                float dl=-0.52f, dr=-0.45f, db=-0.5f+dinoY, dtp=db+0.12f; // Tighter dinosaur bounds (reduced gap)
+                // Precise collision detection for dinosaur
+                float dl=-0.52f, dr=-0.45f, db=-0.5f+dinoY, dtp=db+0.12f; // Tighter dinosaur bounds
                 float ol=obstacles[i].x-hw*0.8f, orr=obstacles[i].x+hw*0.8f, ob=-0.52f, ot=-0.47f; // Tighter obstacle bounds
                 if (dr>ol && dl<orr && dtp>ob && db<ot) { 
-                    gameOver = true; // Game over without console spam
+                    gameOver = true;
                 }
                 if (obstacles[i].x+hw < -1.0f) obstacles.erase(obstacles.begin()+i); else ++i;
             }
         }
-        // Render with dynamic day/night mode
         if (nightMode) {
-            glClearColor(0.15f, 0.15f, 0.15f, 1.0f); // Dark gray background for night mode
+            glClearColor(0.15f, 0.15f, 0.15f, 1.0f); // Dark gray background
         } else {
-            glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // White background for day mode
+            glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // White background
         }
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(prog); glBindVertexArray(VAO);
         GLint oLoc=glGetUniformLocation(prog,"uOffset"), sLoc=glGetUniformLocation(prog,"uScale"), cLoc=glGetUniformLocation(prog,"uColor");
         
-        // Ground color changes with night mode
+        // Ground color change
         if (nightMode) {
-            glUniform3f(cLoc, 0.6f, 0.6f, 0.6f); // Lighter gray ground for night mode
+            glUniform3f(cLoc, 0.6f, 0.6f, 0.6f); // Lighter gray ground
         } else {
-            glUniform3f(cLoc, 0.9f, 0.9f, 0.9f); // Light gray ground for day mode
+            glUniform3f(cLoc, 0.9f, 0.9f, 0.9f); // Light gray ground
         }
         glUniform2f(sLoc,2.0f,0.05f); glUniform2f(oLoc,0.0f,-0.5f); glDrawElements(GL_TRIANGLES,6,GL_UNSIGNED_INT,0);
         
-        // Dinosaur color changes with night mode
+        // Dinosaur color change
         if (nightMode) {
-            glUniform3f(cLoc, 0.9f, 0.9f, 0.9f); // Light gray dinosaur for night mode (inverted)
+            glUniform3f(cLoc, 0.9f, 0.9f, 0.9f); // Light gray
         } else {
-            glUniform3f(cLoc, 0.0f, 0.0f, 0.0f); // Black dinosaur for day mode
+            glUniform3f(cLoc, 0.0f, 0.0f, 0.0f); // Black dinosaur
         }
         
-        // Helper lambda for drawing blocks (inspired by test.cpp)
         auto drawBlock = [&](float ox, float oy, float sx, float sy) {
             glUniform2f(sLoc, sx, sy);
             glUniform2f(oLoc, ox, oy + dinoY);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         };
         
-        // Dinosaur parts using test.cpp sequence and proportions (taller with better tail)
-        drawBlock(-0.5f, -0.43f, 0.08f, 0.08f);     // Main body (taller)
-        drawBlock(-0.54f, -0.46f, 0.04f, 0.05f);     // Body extension (taller)
-        
-        // Forward-pointing triangular head (point at front, base at body)
+        // Dinosaur parts
+        drawBlock(-0.5f, -0.43f, 0.08f, 0.08f);     // Main body
+        drawBlock(-0.54f, -0.46f, 0.04f, 0.05f);     // Body extension
         drawBlock(-0.42f, -0.35f, 0.006f, 0.04f);    // Head tip (narrow point at front)
         drawBlock(-0.435f, -0.35f, 0.015f, 0.045f);  // Head middle section
         drawBlock(-0.455f, -0.35f, 0.025f, 0.05f);   // Head base (wide, connects to body)
         drawBlock(-0.435f, -0.345f, 0.006f, 0.006f); // Eye (positioned on head)
         
-        // Enhanced leg animation like test.cpp (frame-based, not smooth)
+        // leg animation
         if (onGround) {
             float now = glfwGetTime();
-            bool legForward = ((int)(now * 8.0f) % 2) == 0; // 8 FPS alternation like test.cpp
+            bool legForward = ((int)(now * 8.0f) % 2) == 0; // 8 FPS alternation 
             
             if (legForward) {
                 drawBlock(-0.49f, -0.50f, 0.015f, 0.04f);   // Front leg forward
@@ -258,39 +249,37 @@ int main() {
                 drawBlock(-0.49f, -0.505f, 0.015f, 0.035f); // Front leg back
             }
         } else {
-            // Jumping pose - both legs together
+            // Jumping pose
             drawBlock(-0.49f, -0.50f, 0.015f, 0.04f);
             drawBlock(-0.51f, -0.50f, 0.015f, 0.04f);
         }
-        
+
         // Simple tail
         drawBlock(-0.575f, -0.46f, 0.025f, 0.018f);  // Simple tail block
-        drawBlock(-0.47f, -0.42f, 0.008f, 0.025f);   // Arms (positioned on side of body)
+        drawBlock(-0.47f, -0.42f, 0.008f, 0.025f);   // Arms
         
         // Draw grounded cactus obstacles with night mode colors
         for (auto &o:obstacles) { 
-            // Obstacle color changes with night mode
             if (nightMode) {
-                glUniform3f(cLoc, 0.9f, 0.9f, 0.9f); // Light gray obstacles for night mode
+                glUniform3f(cLoc, 0.9f, 0.9f, 0.9f); // Light gray 
             } else {
-                glUniform3f(cLoc, 0.0f, 0.0f, 0.0f); // Black obstacles for day mode
+                glUniform3f(cLoc, 0.0f, 0.0f, 0.0f); // Black obstacles
             }
             
-            // Use same drawBlock helper for consistency
             auto drawObstacle = [&](float ox, float oy, float sx, float sy) {
                 glUniform2f(sLoc, sx, sy);
                 glUniform2f(oLoc, ox, oy);
                 glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             };
             
-            // Main cactus body (grounded, matching test.cpp proportions)
+            // Main cactus body
             drawObstacle(o.x, -0.48f, o.w*0.6f, 0.10f);
             
-            // Small cactus arm (simple, grounded)
+            // Small cactus arm
             drawObstacle(o.x + o.w*0.22f, -0.44f, o.w*0.3f, 0.04f);
         }
         
-        // Draw score on screen using stb_easy_font with night mode colors
+        // Draw score on screen using stb_easy_font
         char buf[64]; 
         if (!gameOver) {
             snprintf(buf, 64, "Score: %d", score);
@@ -301,9 +290,9 @@ int main() {
         // Text color changes with night mode
         unsigned char color[4];
         if (nightMode) {
-            color[0] = 255; color[1] = 255; color[2] = 255; color[3] = 255; // White text for night mode
+            color[0] = 255; color[1] = 255; color[2] = 255; color[3] = 255; // White text
         } else {
-            color[0] = 0; color[1] = 0; color[2] = 0; color[3] = 255; // Black text for day mode
+            color[0] = 0; color[1] = 0; color[2] = 0; color[3] = 255; // Black text
         }
         
         // Generate text vertices with larger scale
@@ -312,7 +301,6 @@ int main() {
         float textX = 50.0f; // Move to top-left for better visibility
         float textY = 50.0f;
         
-        // Create subtle bold effect by drawing text with minimal offsets
         float boldOffsets[][2] = {
             {0, 0}, {1, 0}, {0, 1}, {1, 1} // Only 4 copies for readable bold effect
         };
@@ -322,9 +310,9 @@ int main() {
         
         // Set text color based on night mode
         if (nightMode) {
-            glUniform3f(glGetUniformLocation(textProg, "uTextColor"), 1.0f, 1.0f, 1.0f); // White text for night mode
+            glUniform3f(glGetUniformLocation(textProg, "uTextColor"), 1.0f, 1.0f, 1.0f); // White text
         } else {
-            glUniform3f(glGetUniformLocation(textProg, "uTextColor"), 0.0f, 0.0f, 0.0f); // Black text for day mode
+            glUniform3f(glGetUniformLocation(textProg, "uTextColor"), 0.0f, 0.0f, 0.0f); // Black text
         }
         
         glBindVertexArray(textVAO);
@@ -358,5 +346,6 @@ int main() {
     glDeleteProgram(prog); glDeleteProgram(textProg); 
     glDeleteVertexArrays(1,&VAO); glDeleteVertexArrays(1,&textVAO);
     glDeleteBuffers(1,&VBO); glDeleteBuffers(1,&EBO); glDeleteBuffers(1,&textVBO);
-    glfwTerminate(); return 0;
+    glfwTerminate(); 
+    return 0;
 }
